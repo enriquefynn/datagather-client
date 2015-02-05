@@ -1,4 +1,4 @@
-package research.ufu.datagather;
+package research.ufu.datagather.utils;
 
 
 import org.apache.http.client.HttpClient;

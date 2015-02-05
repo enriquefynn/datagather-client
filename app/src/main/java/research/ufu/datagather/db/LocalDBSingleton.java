@@ -9,7 +9,7 @@ public class LocalDBSingleton {
     {
         if(db == null)
         {
-            db = new LocalDB(Global.appctx, null, null, 1);
+            db = new LocalDB(Global.loggerctx, null, null, 1);
         }
         return db;
     }

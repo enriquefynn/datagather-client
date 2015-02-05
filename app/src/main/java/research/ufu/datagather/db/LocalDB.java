@@ -118,10 +118,7 @@ public class LocalDB extends SQLiteOpenHelper {
             System.out.println(e);
         }
         db.close();
-        User usr = new User(username, password);
-        System.out.println(usr.getUsername());
-        System.out.println(usr.getPassword());
-        return usr;
+        return  new User(username, password);
     }
 
     public void addLocation(double latitude, double longitude, long date){

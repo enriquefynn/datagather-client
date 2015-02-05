@@ -6,20 +6,14 @@ import android.os.Bundle;
 
 
 import research.ufu.datagather.R;
-import research.ufu.datagather.db.LocalDB;
-import research.ufu.datagather.db.LocalDBSingleton;
 import research.ufu.datagather.utils.Global;
 
 public class MainActivity extends Activity {
-    LocalDB db;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Global.appctx = getApplicationContext();
-        db = LocalDBSingleton.getDB();
-        //db.reset();
-        db.getUser();
+
         startService(new Intent(getBaseContext(), Logger.class));
         setContentView(R.layout.main);
     }
