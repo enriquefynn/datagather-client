@@ -38,7 +38,7 @@ public class Utils {
         String result_text = "";
         try {
 
-            HttpClient httpclient = HTTPSingleton.getHttpClient();
+            HttpManager httpclient = HTTPSingleton.getHttpClient();
             HttpPost httpPost = new HttpPost(url);
             StringEntity se = new StringEntity(message);
             httpPost.setEntity(se);
@@ -68,7 +68,7 @@ public class Utils {
         String result_text = "";
         try {
 
-            HttpClient httpclient = HTTPSingleton.getHttpClient();
+            HttpManager httpclient = HTTPSingleton.getHttpClient();
             HttpGet httpGet = new HttpGet(url);
             HttpResponse httpResponse = httpclient.execute(httpGet);
             result.setResultCode(httpResponse.getStatusLine().getStatusCode());
