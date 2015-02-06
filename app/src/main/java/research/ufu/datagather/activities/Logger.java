@@ -145,7 +145,7 @@ public class Logger extends Service {
                 if (tick > Constants.THRESHOLD && hasWifi()) {
                     Log.v(TAG, "Trying to send data");
                     User usr = db.getUser();
-                    Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());
+                    //Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());
                     try{
                         responseHelper = Protocol.POSTJson(Constants.URL_ADD_LOCATION, db.getLocation());
                         if (responseHelper.getResultCode() == 403)
