@@ -142,7 +142,7 @@ public class Logger extends Service {
                 Log.v(TAG, db.getLocation());
                 Log.v(TAG, db.getWifi());
 
-                if (tick > 1 && hasWifi()) {
+                if (tick > Constants.THRESHOLD && hasWifi()) {
                     Log.v(TAG, "Trying to send data");
                     User usr = db.getUser();
                     Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());

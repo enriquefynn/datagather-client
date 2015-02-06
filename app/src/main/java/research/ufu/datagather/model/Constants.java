@@ -3,7 +3,7 @@ package research.ufu.datagather.model;
 
 public class Constants {
     public static String LONG_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'";
-    public static int PORT = 8443;
+    public static int PORT = 443;
     public static String SERVER_URL = "https://slayer.dlinkddns.com:" + PORT;
     public static String URL_AUTH = SERVER_URL + "/auth";
     public static String URL_LAST_LOCATION = SERVER_URL + "/lastLocation";
