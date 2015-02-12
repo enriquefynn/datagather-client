@@ -3,20 +3,28 @@ package research.ufu.datagather.activities;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
+import android.os.Binder;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
+import android.os.Message;
+import android.os.Messenger;
+import android.os.RemoteException;
 import android.util.Log;
+import android.widget.TextView;
 
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import research.ufu.datagather.R;
 import research.ufu.datagather.db.LocalDB;
 import research.ufu.datagather.db.LocalDBSingleton;
 import research.ufu.datagather.model.Constants;
@@ -34,7 +42,17 @@ public class Logger extends Service {
     private LocationManager mLocationManager = null;
     private double lon = 0.;
     private double lat = 0.;
-    private long tick = 0;
+    private long lastSync = 0;
+    boolean shouldSend = true;
+
+    private Messenger messageHandler = new Messenger(new ConvertHanlder());
+
+    class ConvertHanlder extends Handler {
+
+        @Override
+        public void handleMessage(Message msg) {
+        }
+    }
 
     private class LocationListener implements android.location.LocationListener{
         Location mLastLocation;
@@ -74,12 +92,74 @@ public class Logger extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        // TODO: Return the communication channel to the service.
-        throw new UnsupportedOperationException("Not yet implemented");
+        shouldSend = true;
+        return messageHandler.getBinder();
     }
+
+    public class MyBinder extends Binder {
+        Logger getService() {
+            return Logger.this;
+        }
+    }
+
+    public void sendTick(long tick) {
+        if (shouldSend == false)
+            return;
+        Message message = Message.obtain();
+        Bundle bundle = new Bundle();
+        bundle.putLong("TICK", tick);
+        message.setData(bundle);
+        message.arg1 = Constants.MSG_TICK;
+        try {
+            messageHandler.send(message);
+        } catch (RemoteException e) {
+            shouldSend = false;
+            e.printStackTrace();
+        }
+    }
+    public void sendLastSync(long date) {
+        if (shouldSend == false)
+            return;
+        Message message = Message.obtain();
+        Bundle bundle = new Bundle();
+        bundle.putLong("LASTSYNC", date);
+        message.setData(bundle);
+        message.arg1 = Constants.MSG_LAST_SYNC;
+        try {
+            messageHandler.send(message);
+        } catch (RemoteException e) {
+            shouldSend = false;
+            e.printStackTrace();
+        }
+    }
+    public void sendError(int error) {
+        if (shouldSend == false)
+            return;
+        Message message = Message.obtain();
+        Bundle bundle = new Bundle();
+        bundle.putInt("ERROR", error);
+        message.setData(bundle);
+        message.arg1 = Constants.MSG_SERVER_ERROR;
+        try {
+            messageHandler.send(message);
+        } catch (RemoteException e) {
+            shouldSend = false;
+            e.printStackTrace();
+        }
+    }
+
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId){
+        Constants.SERVICE_RUNNING = true;
+        try {
+            Bundle extras = intent.getExtras();
+            messageHandler = (Messenger) extras.get("MESSENGER");
+        }catch (Exception ex){
+            Log.e(TAG, "Could not get main application");
+            shouldSend = false;
+        }
+
         Global.loggerctx = getApplicationContext();
         db = LocalDBSingleton.getDB();
         super.onStartCommand(intent, flags, startId);
@@ -116,15 +196,18 @@ public class Logger extends Service {
             ResponseHelper responseHelper;
             @Override
             public void run() {
-                ++tick;
+                int tick = db.getNumberOfData();
+                sendTick(tick);
                 long timestamp = System.currentTimeMillis();
                 StringBuilder bssids = new StringBuilder();
                 try {
                     wifi.startScan();
                     List<ScanResult> results = wifi.getScanResults();
 
-                    for (ScanResult result : results) {
-                        bssids.append(result.BSSID);
+                    for (int i = 0; i < results.size(); ++i) {
+                        bssids.append(results.get(i).BSSID + ":" + results.get(i).level);
+                        if (i < results.size()-1)
+                            bssids.append(",");
                     }
                 }
                 catch(Exception ex){
@@ -132,7 +215,7 @@ public class Logger extends Service {
                     WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
                     if (wifi.isWifiEnabled() == false)
                     {
-                        Log.e(TAG, "wifi is disabled..making it enabled");
+                        Log.e(TAG, "wifi is disabled... Making it enabled");
                         wifi.setWifiEnabled(true);
                     }
                 }
@@ -145,33 +228,48 @@ public class Logger extends Service {
                 if (tick > Constants.THRESHOLD && hasWifi()) {
                     Log.v(TAG, "Trying to send data");
                     User usr = db.getUser();
-                    //Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());
+                    Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());
+                    //TODO: Async
                     try{
                         responseHelper = Protocol.POSTJson(Constants.URL_ADD_LOCATION, db.getLocation());
-                        if (responseHelper.getResultCode() == 403)
+                        if (responseHelper.getResultCode() == 403) {
+                            sendError(403);
                             throw new ForbiddenException("Forbidden");
-                        if (responseHelper.getResultCode() != 200)
+                        }
+                        if (responseHelper.getResultCode() != 200) {
+                            sendError(responseHelper.getResultCode());
                             throw new Exception("Error in connection when tried to send location "
-                            + responseHelper.getResultCode());
+                                    + responseHelper.getResultCode());
+                        }
 
                         responseHelper = Protocol.POSTJson(Constants.URL_ADD_WIFI, db.getWifi());
-                        if (responseHelper.getResultCode() == 403)
+                        if (responseHelper.getResultCode() == 403) {
+                            sendError(responseHelper.getResultCode());
                             throw new ForbiddenException("Forbidden");
-                        if (responseHelper.getResultCode() != 200)
+                        }
+                        if (responseHelper.getResultCode() != 200) {
+                            sendError(responseHelper.getResultCode());
                             throw new Exception("Error in connection when tried to send Wifi "
-                            + responseHelper.getResultCode());
+                                    + responseHelper.getResultCode());
+                        }
 
                         Log.v(TAG, "All data sent, deleting local DB");
+                        sendError(200);
+                        SharedPreferences.Editor editor = Global.appctx.getSharedPreferences(
+                                Constants.SHARED_DATA, MODE_PRIVATE).edit();
+                        editor.putLong("lastSync", timestamp);
+                        editor.commit();
+                        sendLastSync(timestamp);
                         db.deleteAll();
-                        tick = 0;
-
                     }
                     catch (ForbiddenException e) {
                         try {
                             Log.v(TAG, "Got a forbidden, trying to log in");
                             responseHelper = Protocol.createOrlogin(usr);
-                            if (responseHelper.getResultCode() != 200)
+                            if (responseHelper.getResultCode() != 200) {
+                                sendError(responseHelper.getResultCode());
                                 throw new Exception("Error " + responseHelper.getResultCode());
+                            }
                         } catch (Exception ex) {
                             Log.e(TAG, ex.getMessage());
                         }

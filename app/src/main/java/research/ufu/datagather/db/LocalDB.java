@@ -35,7 +35,9 @@ public class LocalDB extends SQLiteOpenHelper {
 
     public static final String COLUMN_LON = "long";
     public static final String COLUMN_LAT = "lat";
+
     public static final String COLUMN_NAME = "name";
+
     public static final String COLUMN_TIMESTAMP = "timestamp";
 
 
@@ -73,7 +75,6 @@ public class LocalDB extends SQLiteOpenHelper {
         values.put(COLUMN_USERNAME, LocalDB.generateString(20));
         values.put(COLUMN_PASSWORD, LocalDB.generateString(20));
         db.insert(TABLE_USER, null, values);
-
     }
 
     public void reset()
@@ -148,29 +149,25 @@ public class LocalDB extends SQLiteOpenHelper {
         db.close();
     }
 
-    public boolean isSynced(long lastLocationDate, long lastWifiDate){
+    public int getNumberOfData(){
+        int nData = 0;
         //SELECT * FROM Table ORDER BY ID DESC LIMIT 1
-        String queryLoc = "Select * FROM " + TABLE_LOCATION + " ORDER_BY " + COLUMN_TIMESTAMP + " DESC LIMIT 1";
-        String queryWifi = "Select * FROM " + TABLE_WIFI + " ORDER_BY " + COLUMN_TIMESTAMP + " DESC LIMIT 1";
+        String queryLoc = "Select Count(*) FROM " + TABLE_LOCATION;
         SQLiteDatabase db = this.getReadableDatabase();
 
         Cursor cursorLoc = db.rawQuery(queryLoc, null);
-        Cursor cursorWifi = db.rawQuery(queryWifi, null);
         cursorLoc.moveToFirst();
-        cursorWifi.moveToFirst();
         try
         {
-            if (cursorLoc.getLong(cursorLoc.getColumnIndex(COLUMN_TIMESTAMP)) < lastLocationDate)
-                return false;
-            if (cursorWifi.getLong(cursorWifi.getColumnIndex(COLUMN_TIMESTAMP)) < lastLocationDate)
-                return false;
+            nData = cursorLoc.getInt(0);
         }
         catch(Exception e) {
             cursorLoc.close();
-            cursorWifi.close();
             System.out.println(e);
         }
-        return true;
+        finally {
+            return nData;
+        }
     }
 
     public boolean deleteAll(){
@@ -236,7 +233,6 @@ public class LocalDB extends SQLiteOpenHelper {
         db.close();
         return array.toString();
     }
-
 
     public static String generateString(int length)
     {

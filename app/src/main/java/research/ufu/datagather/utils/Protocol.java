@@ -1,5 +1,6 @@
 package research.ufu.datagather.utils;
 
+import android.os.AsyncTask;
 import android.util.Log;
 
 import org.apache.http.HttpResponse;
@@ -52,6 +53,19 @@ public class Protocol {
         }
 
         return result;
+    }
+
+    public static class POSTJsonAsync extends AsyncTask<String, Void, ResponseHelper> {
+        private String url;
+
+        public POSTJsonAsync(String u) {
+            url = u;
+        }
+
+        @Override
+        protected ResponseHelper doInBackground(String... params) {
+            return POSTJson(url, params[0]);
+        }
     }
 
     public static ResponseHelper GET(String url) {

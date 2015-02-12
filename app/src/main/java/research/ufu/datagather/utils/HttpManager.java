@@ -45,8 +45,8 @@ public class HttpManager {
 
         // Set timeout
         HttpConnectionParams.setStaleCheckingEnabled(params, false);
-        HttpConnectionParams.setConnectionTimeout(params, 20 * 1000);
-        HttpConnectionParams.setSoTimeout(params, 20 * 1000);
+        HttpConnectionParams.setConnectionTimeout(params, Constants.TIMEOUT * 1000);
+        HttpConnectionParams.setSoTimeout(params, Constants.TIMEOUT * 1000);
         HttpConnectionParams.setSocketBufferSize(params, 8192);
 
         // Some client params
@@ -60,9 +60,6 @@ public class HttpManager {
         ClientConnectionManager conMgr = new ThreadSafeClientConnManager(
                 params, schReg);
         sClient = new DefaultHttpClient(conMgr, params);
-    }
-
-    public HttpManager() {
     }
 
     public static HttpResponse execute(HttpHead head) throws IOException {
