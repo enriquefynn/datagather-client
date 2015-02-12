@@ -1,0 +1,7 @@
+<resources>
+
+    <string name="crypto">Todos os dados no servidor são anônimos e enviados utilizando criptografia</string>
+    <string name="terms">Termos</string>
+    <string name="utilization">Ao utilizar este aplicativo você concorda com os termos em:</string>
+
+</resources>

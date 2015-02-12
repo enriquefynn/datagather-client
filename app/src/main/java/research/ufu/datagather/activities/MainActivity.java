@@ -7,12 +7,14 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.os.Messenger;
 import android.util.Log;
+import android.view.View;
 import android.widget.TextView;
 
 
@@ -118,6 +120,12 @@ public class MainActivity extends Activity {
             unbindService(connection);
             mBound = false;
         }
+    }
+
+    public void goToUrl (View view) {
+        Uri uriUrl = Uri.parse("https://sites.google.com/site/distributedsystemsandnetworks/datagather_");
+        Intent launchBrowser = new Intent(Intent.ACTION_VIEW, uriUrl);
+        startActivity(launchBrowser);
     }
 }                                                                                                                         
                                                                                                                           

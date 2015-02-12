@@ -3,5 +3,8 @@
 
     <string name="app_name">DataGather</string>
     <string name="title_activity_maps">DataGather</string>
+    <string name="crypto">All data in the server is anonymous and sent with high grade cryptography</string>
+    <string name="utilization">By using this app you agree with the terms at:</string>
+    <string name="terms">Terms</string>
 
 </resources>
