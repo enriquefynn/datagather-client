@@ -8,6 +8,8 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -75,14 +77,6 @@ public class MainActivity extends Activity {
         textTick = (TextView) findViewById(R.id.tick);
         textLastSync = (TextView) findViewById(R.id.lastsync);
         textServerError = (TextView) findViewById(R.id.servererror);
-
-        long lastSync = getSharedPreferences(Constants.SHARED_DATA, MODE_PRIVATE).
-                getLong("lastSync", 0L);
-        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-        String date = sdf.format(new Date(lastSync));
-        if (lastSync != 0L)
-            textLastSync.setText(date);
-
         Intent startS = new Intent(Global.appctx, Logger.class);
         startS.putExtra("MESSENGER", new Messenger(messageHandler));
         if (Constants.SERVICE_RUNNING == false) {
@@ -103,8 +97,29 @@ public class MainActivity extends Activity {
                 mBound = false;
             }
         };
-        bindService(startS, connection, Context.BIND_AUTO_CREATE);
-
+        try {
+            bindService(startS, connection, Context.BIND_AUTO_CREATE);
+        }
+        catch(Exception ex){
+            Log.v("Main", "Could not bind");
+        }
+        try {
+            SharedPreferences preferences = Global.loggerctx.getSharedPreferences(Constants.SHARED_DATA, MODE_PRIVATE);
+            long lastSync = preferences.getLong("lastSync", 0L);
+            int tick = preferences.getInt("tick", 0);
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+            String date = sdf.format(new Date(lastSync));
+            if (lastSync != 0L)
+                textLastSync.setText(date);
+            textTick.setText(String.valueOf(tick));
+        }
+        catch(Exception ex){
+            Log.e("Main", "Failed to get logger ctx");
+        }
+        WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        if (Build.VERSION.SDK_INT >= 18 && !wifi.isScanAlwaysAvailable()) {
+            startActivity(new Intent(WifiManager.ACTION_REQUEST_SCAN_ALWAYS_AVAILABLE));
+        }
     }
 
     @Override
@@ -122,8 +137,16 @@ public class MainActivity extends Activity {
         }
     }
 
-    public void goToUrl (View view) {
-        Uri uriUrl = Uri.parse("https://sites.google.com/site/distributedsystemsandnetworks/datagather_");
+    public void goToUrlPt(View view){
+        goToUrl("https://sites.google.com/site/distributedsystemsandnetworks/datagather_");
+    }
+
+    public void goToUrlEn(View view){
+        goToUrl("https://sites.google.com/site/distributedsystemsandnetworks/datagather");
+    }
+
+    private void goToUrl (String url) {
+        Uri uriUrl = Uri.parse(url);
         Intent launchBrowser = new Intent(Intent.ACTION_VIEW, uriUrl);
         startActivity(launchBrowser);
     }

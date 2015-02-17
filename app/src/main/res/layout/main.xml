@@ -97,7 +97,7 @@
             android:layout_weight="0.07"
             android:linksClickable="true"
             android:autoLink="web"
-            android:onClick="goToUrl" />
+            android:onClick="@string/gotourl" />
 
         <Space
             android:layout_width="match_parent"

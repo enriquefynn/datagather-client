@@ -1,8 +1,10 @@
 package research.ufu.datagather.activities;
 
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.location.Location;
 import android.location.LocationManager;
@@ -11,6 +13,7 @@ import android.net.NetworkInfo;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
@@ -18,13 +21,12 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 import android.util.Log;
-import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import research.ufu.datagather.R;
 import research.ufu.datagather.db.LocalDB;
 import research.ufu.datagather.db.LocalDBSingleton;
 import research.ufu.datagather.model.Constants;
@@ -42,8 +44,11 @@ public class Logger extends Service {
     private LocationManager mLocationManager = null;
     private double lon = 0.;
     private double lat = 0.;
+    List<ScanResult> results;
     private long lastSync = 0;
     boolean shouldSend = true;
+    SharedPreferences.Editor editor;
+    boolean wifiStatus = false;
 
     private Messenger messageHandler = new Messenger(new ConvertHanlder());
 
@@ -148,9 +153,17 @@ public class Logger extends Service {
         }
     }
 
-
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId){
+    public int onStartCommand(final Intent intent, int flags, int startId){
+        Global.loggerctx = getApplicationContext();
+        try {
+            editor = getSharedPreferences(
+                    Constants.SHARED_DATA, MODE_PRIVATE).edit();
+        }
+        catch(Exception ex){
+            Log.e(TAG, "Failed to get app context");
+        }
+
         Constants.SERVICE_RUNNING = true;
         try {
             Bundle extras = intent.getExtras();
@@ -160,16 +173,8 @@ public class Logger extends Service {
             shouldSend = false;
         }
 
-        Global.loggerctx = getApplicationContext();
         db = LocalDBSingleton.getDB();
         super.onStartCommand(intent, flags, startId);
-
-        final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        if (wifi.isWifiEnabled() == false)
-        {
-           Log.e(TAG, "wifi is disabled..making it enabled");
-           wifi.setWifiEnabled(true);
-        }
 
         Timer timer = new Timer();
         initializeLocationManager();
@@ -192,18 +197,66 @@ public class Logger extends Service {
             Log.e(TAG, "gps provider does not exist " + ex.getMessage());
         }
 
+        IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
+        registerReceiver(new BroadcastReceiver(){
+            public void onReceive(Context c, Intent i){
+                Log.i(TAG, "Got wifi results!");
+                final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+                results = wifi.getScanResults();
+                if (Build.VERSION.SDK_INT >= 18 && wifi.isScanAlwaysAvailable())
+                    return;
+                sendBroadcast(new Intent(Constants.WIFI_CHANGED_ACTION).putExtra("DISCONNECT",true));
+            }
+        }, intentFilter);
+
+        IntentFilter wifiChangedFilter = new IntentFilter(Constants.WIFI_CHANGED_ACTION);
+        registerReceiver(new BroadcastReceiver(){
+            @Override
+            public void onReceive(Context c, Intent i) {
+                Log.i(TAG, "YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
+                final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+                if (i.getExtras().getBoolean("DISCONNECT", false)) {
+                    wifi.setWifiEnabled(wifiStatus);
+                }
+                else {
+                    Log.i(TAG, "SETTING STATUS: " + wifi.isWifiEnabled());
+                    wifiStatus = wifi.isWifiEnabled();
+                    if (!wifi.isWifiEnabled() &&
+                            !(Build.VERSION.SDK_INT >= 18 && wifi.isScanAlwaysAvailable())) {
+                        Log.i(TAG, "Wifi disabled, turning on...");
+                        wifi.setWifiEnabled(true);
+                    }
+                    wifi.startScan();
+                }
+            }
+        }, wifiChangedFilter);
+
+        final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+
         timer.schedule(new TimerTask(){
             ResponseHelper responseHelper;
             @Override
             public void run() {
+                Intent getWifiStatus = new Intent(Constants.WIFI_CHANGED_ACTION);
+                getWifiStatus.putExtra("DISCONNECT", false);
+                sendBroadcast(getWifiStatus);
+
                 int tick = db.getNumberOfData();
                 sendTick(tick);
                 long timestamp = System.currentTimeMillis();
                 StringBuilder bssids = new StringBuilder();
                 try {
-                    wifi.startScan();
-                    List<ScanResult> results = wifi.getScanResults();
+                    try {
+                        editor.putInt("tick", tick);
+                    }
+                    catch(Exception ex){
+                        Log.e(TAG, "Failed to use editor");
+                    }
 
+                    if (results == null)
+                        results = new ArrayList<ScanResult>();
+                    Log.i(TAG, results.toString());
                     for (int i = 0; i < results.size(); ++i) {
                         bssids.append(results.get(i).BSSID + ":" + results.get(i).level);
                         if (i < results.size()-1)
@@ -211,13 +264,7 @@ public class Logger extends Service {
                     }
                 }
                 catch(Exception ex){
-                    Log.e(TAG, "Could not gather wifi data, trying to turn it on");
-                    WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-                    if (wifi.isWifiEnabled() == false)
-                    {
-                        Log.e(TAG, "wifi is disabled... Making it enabled");
-                        wifi.setWifiEnabled(true);
-                    }
+                    Log.e(TAG, "Could not gather wifi data");
                 }
                 db.addLocation(lat, lon, timestamp);
                 db.addWifi(bssids.toString(), timestamp);
@@ -255,10 +302,12 @@ public class Logger extends Service {
 
                         Log.v(TAG, "All data sent, deleting local DB");
                         sendError(200);
-                        SharedPreferences.Editor editor = Global.appctx.getSharedPreferences(
-                                Constants.SHARED_DATA, MODE_PRIVATE).edit();
-                        editor.putLong("lastSync", timestamp);
-                        editor.commit();
+                        try {
+                            editor.putLong("lastSync", timestamp);
+                        }
+                        catch(Exception ex){
+                            Log.e(TAG, "Failed to get editor");
+                        }
                         sendLastSync(timestamp);
                         db.deleteAll();
                     }
@@ -277,6 +326,13 @@ public class Logger extends Service {
                     catch (Exception e) {
                         Log.e(TAG, e.getMessage());
                     }
+                }
+                try {
+                    editor.commit();
+                    editor.clear();
+                }
+                catch(Exception ex){
+                    Log.e(TAG, "Failed to get editor");
                 }
             }
         }, 0, Constants.TIME_STEP*1000);
