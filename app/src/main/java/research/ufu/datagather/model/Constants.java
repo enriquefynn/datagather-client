@@ -12,7 +12,6 @@ public class Constants {
     public static String URL_ADD_LOCATION = SERVER_URL + "/addLocation";
     public static String URL_ADD_WIFI = SERVER_URL + "/addWifi";
     public static String CERTIFICATE_KEY = "CA:8A:92:6F:4F:E5:D5:7E:C6:E7:C5:7C:B3:E0:87:80:99:64:4B:33";
-    public static String WIFI_CHANGED_ACTION = "WIFI_CHANGED";
 
     //In seconds
     public static int TIME_STEP = 15;

@@ -101,8 +101,8 @@ public class LocalDB extends SQLiteOpenHelper {
     public User getUser(){
         String username, password;
         username = password = "";
-        String usernameQ = "Select " + COLUMN_USERNAME + " FROM " + TABLE_USER;
-        String passwordQ = "Select " + COLUMN_PASSWORD + " FROM " + TABLE_USER;
+        String usernameQ = "SELECT " + COLUMN_USERNAME + " FROM " + TABLE_USER;
+        String passwordQ = "SELECT " + COLUMN_PASSWORD + " FROM " + TABLE_USER;
         SQLiteDatabase db = this.getReadableDatabase();
 
         Cursor cursorUsr = db.rawQuery(usernameQ, null);
@@ -152,7 +152,7 @@ public class LocalDB extends SQLiteOpenHelper {
     public int getNumberOfData(){
         int nData = 0;
         //SELECT * FROM Table ORDER BY ID DESC LIMIT 1
-        String queryLoc = "Select Count(*) FROM " + TABLE_LOCATION;
+        String queryLoc = "SELECT COUNT(*) FROM " + TABLE_LOCATION;
         SQLiteDatabase db = this.getReadableDatabase();
 
         Cursor cursorLoc = db.rawQuery(queryLoc, null);
@@ -170,12 +170,13 @@ public class LocalDB extends SQLiteOpenHelper {
         }
     }
 
-    public boolean deleteAll(){
+    public boolean deleteWifi(int n){
         try {
             SQLiteDatabase db = this.getWritableDatabase();
-            db.delete(TABLE_LOCATION, null, null);
-            db.delete(TABLE_WIFI, null, null);
-
+            String deleteQ = "DELETE FROM " + TABLE_WIFI + " WHERE " + COLUMN_TIMESTAMP +
+                    " IN (SELECT " + COLUMN_TIMESTAMP + " FROM " + TABLE_WIFI + " ORDER BY " +
+                    COLUMN_TIMESTAMP + " ASC LIMIT " + n + " )";
+            db.execSQL(deleteQ);
         }
         catch(Exception e){
             Log.e(TAG, e.getMessage());
@@ -183,10 +184,25 @@ public class LocalDB extends SQLiteOpenHelper {
         return true;
     }
 
-    public String getLocation(){
+    public boolean deleteLocation(int n){
+        try {
+            SQLiteDatabase db = this.getWritableDatabase();
+            String deleteQ = "DELETE FROM " + TABLE_LOCATION + " WHERE " + COLUMN_TIMESTAMP +
+                    " IN (SELECT " + COLUMN_TIMESTAMP + " FROM " + TABLE_LOCATION + " ORDER BY " +
+                    COLUMN_TIMESTAMP + " ASC LIMIT " + n + " )";
+            db.execSQL(deleteQ);
+        }
+        catch(Exception e){
+            Log.e(TAG, e.getMessage());
+        }
+        return true;
+    }
+
+    public String getLocation(int n){
         JSONArray array = new JSONArray();
 
-        String locationQ = "Select * FROM " + TABLE_LOCATION;
+        String locationQ = "SELECT * FROM " + TABLE_LOCATION +
+                " ORDER BY " + COLUMN_TIMESTAMP + " ASC LIMIT " + n;
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(locationQ, null);
         if(cursor.moveToFirst())
@@ -209,10 +225,11 @@ public class LocalDB extends SQLiteOpenHelper {
         return array.toString();
     }
 
-    public String getWifi(){
+    public String getWifi(int n){
         JSONArray array = new JSONArray();
 
-        String wifiQ = "Select * FROM " + TABLE_WIFI;
+        String wifiQ = "SELECT * FROM " + TABLE_WIFI +
+                " ORDER BY " + COLUMN_TIMESTAMP + " ASC LIMIT " + n;
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(wifiQ, null);
         if(cursor.moveToFirst())

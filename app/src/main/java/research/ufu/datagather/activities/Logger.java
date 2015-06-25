@@ -91,7 +91,7 @@ public class Logger extends Service {
         }
     }
     LocationListener[] mLocationListeners = new LocationListener[] {
-            new LocationListener(LocationManager.GPS_PROVIDER),
+            //new LocationListener(LocationManager.GPS_PROVIDER),
             new LocationListener(LocationManager.NETWORK_PROVIDER)
     };
 
@@ -181,12 +181,12 @@ public class Logger extends Service {
         try {
             mLocationManager.requestLocationUpdates(
                     LocationManager.NETWORK_PROVIDER, (Constants.TIME_STEP-1)*1000, LOCATION_DISTANCE,
-                    mLocationListeners[1]);
+                    mLocationListeners[0]);
         } catch (java.lang.SecurityException ex) {
             Log.e(TAG, "fail to request location update, ignore " + ex.getMessage());
         } catch (IllegalArgumentException ex) {
             Log.e(TAG, "network provider does not exist, " + ex.getMessage());
-        }
+        }/*
         try {
             mLocationManager.requestLocationUpdates(
                     LocationManager.GPS_PROVIDER, (Constants.TIME_STEP-1)*1000, LOCATION_DISTANCE,
@@ -195,7 +195,7 @@ public class Logger extends Service {
             Log.e(TAG, "fail to request location update, ignore" + ex.getMessage());
         } catch (IllegalArgumentException ex) {
             Log.e(TAG, "gps provider does not exist " + ex.getMessage());
-        }
+        }*/
 
         IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
@@ -206,31 +206,9 @@ public class Logger extends Service {
                 results = wifi.getScanResults();
                 if (Build.VERSION.SDK_INT >= 18 && wifi.isScanAlwaysAvailable())
                     return;
-                sendBroadcast(new Intent(Constants.WIFI_CHANGED_ACTION).putExtra("DISCONNECT",true));
+                wifi.setWifiEnabled(true);
             }
         }, intentFilter);
-
-        IntentFilter wifiChangedFilter = new IntentFilter(Constants.WIFI_CHANGED_ACTION);
-        registerReceiver(new BroadcastReceiver(){
-            @Override
-            public void onReceive(Context c, Intent i) {
-                Log.i(TAG, "YOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
-                final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-                if (i.getExtras().getBoolean("DISCONNECT", false)) {
-                    wifi.setWifiEnabled(wifiStatus);
-                }
-                else {
-                    Log.i(TAG, "SETTING STATUS: " + wifi.isWifiEnabled());
-                    wifiStatus = wifi.isWifiEnabled();
-                    if (!wifi.isWifiEnabled() &&
-                            !(Build.VERSION.SDK_INT >= 18 && wifi.isScanAlwaysAvailable())) {
-                        Log.i(TAG, "Wifi disabled, turning on...");
-                        wifi.setWifiEnabled(true);
-                    }
-                    wifi.startScan();
-                }
-            }
-        }, wifiChangedFilter);
 
         final WifiManager wifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
 
@@ -238,11 +216,11 @@ public class Logger extends Service {
             ResponseHelper responseHelper;
             @Override
             public void run() {
-                Intent getWifiStatus = new Intent(Constants.WIFI_CHANGED_ACTION);
-                getWifiStatus.putExtra("DISCONNECT", false);
-                sendBroadcast(getWifiStatus);
 
+                wifi.startScan();
                 int tick = db.getNumberOfData();
+                Log.v(TAG, "NUMBER OF DATA: " + tick);
+
                 sendTick(tick);
                 long timestamp = System.currentTimeMillis();
                 StringBuilder bssids = new StringBuilder();
@@ -269,8 +247,8 @@ public class Logger extends Service {
                 db.addLocation(lat, lon, timestamp);
                 db.addWifi(bssids.toString(), timestamp);
 
-                Log.v(TAG, db.getLocation());
-                Log.v(TAG, db.getWifi());
+                Log.v(TAG, db.getLocation(Constants.THRESHOLD));
+                Log.v(TAG, db.getWifi(Constants.THRESHOLD));
 
                 if (tick > Constants.THRESHOLD && hasWifi()) {
                     Log.v(TAG, "Trying to send data");
@@ -278,7 +256,7 @@ public class Logger extends Service {
                     Log.v(TAG, usr.getUsername() + ' ' + usr.getPassword());
                     //TODO: Async
                     try{
-                        responseHelper = Protocol.POSTJson(Constants.URL_ADD_LOCATION, db.getLocation());
+                        responseHelper = Protocol.POSTJson(Constants.URL_ADD_LOCATION, db.getLocation(Constants.THRESHOLD));
                         if (responseHelper.getResultCode() == 403) {
                             sendError(403);
                             throw new ForbiddenException("Forbidden");
@@ -289,7 +267,7 @@ public class Logger extends Service {
                                     + responseHelper.getResultCode());
                         }
 
-                        responseHelper = Protocol.POSTJson(Constants.URL_ADD_WIFI, db.getWifi());
+                        responseHelper = Protocol.POSTJson(Constants.URL_ADD_WIFI, db.getWifi(Constants.THRESHOLD));
                         if (responseHelper.getResultCode() == 403) {
                             sendError(responseHelper.getResultCode());
                             throw new ForbiddenException("Forbidden");
@@ -309,7 +287,8 @@ public class Logger extends Service {
                             Log.e(TAG, "Failed to get editor");
                         }
                         sendLastSync(timestamp);
-                        db.deleteAll();
+                        db.deleteWifi(Constants.THRESHOLD);
+                        db.deleteLocation(Constants.THRESHOLD);
                     }
                     catch (ForbiddenException e) {
                         try {
